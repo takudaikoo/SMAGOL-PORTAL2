@@ -1,13 +1,26 @@
 import { GoogleGenAI } from "@google/genai";
 import { Coupon, User } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize AI client lazily or safely
+const getAiClient = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn("Gemini API Key is not set (VITE_GEMINI_API_KEY). AI features will utilize fallback responses.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getCouponRecommendation = async (user: User, coupons: Coupon[]): Promise<string> => {
   try {
+    const ai = getAiClient();
+    if (!ai) {
+      return "お得なクーポンをご用意しております。ぜひご利用ください！(AI未連携)";
+    }
+
     const availableCoupons = coupons.filter(c => !c.isUsed).map(c => `${c.title} (${c.discount})`).join(', ');
-    
-    // Simulate current context (e.g., time of day)
+
+    // Simulate current context
     const hour = new Date().getHours();
     let timeContext = "昼下がり";
     if (hour < 11) timeContext = "朝";
@@ -34,6 +47,7 @@ export const getCouponRecommendation = async (user: User, coupons: Coupon[]): Pr
     return response.text || "本日のおすすめクーポンをチェックしてください！";
   } catch (error) {
     console.error("Gemini API Error:", error);
+    // Fallback message
     return "お得なクーポンをご用意しております。ぜひご利用ください！";
   }
 };
