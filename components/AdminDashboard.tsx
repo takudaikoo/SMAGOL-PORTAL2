@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Save, ArrowLeft, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, Edit2, Upload, X } from 'lucide-react';
 import { useAppData } from '../contexts/AppDataContext';
 import { Coupon, NewsItem, Partner, CategoryType } from '../types';
+import { uploadImage, validateImageFile, BucketName } from '../lib/imageUpload';
 
 const CATEGORY_OPTIONS: { value: CategoryType; label: string }[] = [
     { value: 'GOLF_COURSE', label: 'ゴルフ場' },
@@ -15,12 +16,91 @@ const CATEGORY_OPTIONS: { value: CategoryType; label: string }[] = [
     { value: 'OTHER', label: 'その他' },
 ];
 
+// Image Upload Component
+interface ImageUploadProps {
+    currentUrl?: string;
+    onUpload: (url: string) => void;
+    bucket: BucketName;
+    label: string;
+}
+
+const ImageUpload: React.FC<ImageUploadProps> = ({ currentUrl, onUpload, bucket, label }) => {
+    const [uploading, setUploading] = useState(false);
+    const [preview, setPreview] = useState<string | undefined>(currentUrl);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+            alert(validation.error);
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const url = await uploadImage(file, bucket);
+            if (url) {
+                setPreview(url);
+                onUpload(url);
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('画像のアップロードに失敗しました');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleRemove = () => {
+        setPreview(undefined);
+        onUpload('');
+    };
+
+    return (
+        <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-500">{label}</label>
+
+            {preview ? (
+                <div className="relative">
+                    <img src={preview} alt="Preview" className="w-full h-32 object-cover rounded border" />
+                    <button
+                        type="button"
+                        onClick={handleRemove}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+            ) : (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                        <p className="text-xs text-gray-500">
+                            {uploading ? 'アップロード中...' : 'クリックして画像を選択'}
+                        </p>
+                    </div>
+                    <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={uploading}
+                    />
+                </label>
+            )}
+        </div>
+    );
+};
+
 const AdminDashboard = () => {
     const {
         config, updateConfig, resetData,
         news, addNews, updateNews, deleteNews,
         coupons, addCoupon, updateCoupon, deleteCoupon,
-        partners, addPartner, updatePartner, deletePartner
+        partners, addPartner, updatePartner, deletePartner,
+        loading
     } = useAppData();
 
     const [activeTab, setActiveTab] = useState<'AI' | 'NEWS' | 'COUPON' | 'PARTNER'>('AI');
@@ -35,8 +115,8 @@ const AdminDashboard = () => {
     const [localPrompt, setLocalPrompt] = useState(config.systemPrompt);
     const [localKnowledge, setLocalKnowledge] = useState(config.knowledgeBase);
 
-    const handleSaveAi = () => {
-        updateConfig({ systemPrompt: localPrompt, knowledgeBase: localKnowledge });
+    const handleSaveAi = async () => {
+        await updateConfig({ systemPrompt: localPrompt, knowledgeBase: localKnowledge });
         showMessage("AI設定を保存しました");
     };
 
@@ -45,13 +125,13 @@ const AdminDashboard = () => {
     const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
     const [newsForm, setNewsForm] = useState<Omit<NewsItem, 'id'>>({ title: '', date: '', imageUrl: '' });
 
-    const handleNewsSubmit = (e: React.FormEvent) => {
+    const handleNewsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingNewsId) {
-            updateNews(editingNewsId, newsForm);
+            await updateNews(editingNewsId, newsForm);
             showMessage("お知らせを更新しました");
         } else {
-            addNews(newsForm);
+            await addNews(newsForm);
             showMessage("お知らせを追加しました");
         }
         setIsEditingNews(false);
@@ -80,7 +160,7 @@ const AdminDashboard = () => {
         imageUrl: ''
     });
 
-    const handleCouponSubmit = (e: React.FormEvent) => {
+    const handleCouponSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const submission = {
             ...couponForm,
@@ -90,10 +170,10 @@ const AdminDashboard = () => {
         };
 
         if (editingCouponId) {
-            updateCoupon(editingCouponId, submission);
+            await updateCoupon(editingCouponId, submission);
             showMessage("クーポンを更新しました");
         } else {
-            addCoupon(submission);
+            await addCoupon(submission);
             showMessage("クーポンを追加しました");
         }
         setIsEditingCoupon(false);
@@ -137,13 +217,13 @@ const AdminDashboard = () => {
         description: ''
     });
 
-    const handlePartnerSubmit = (e: React.FormEvent) => {
+    const handlePartnerSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingPartnerId) {
-            updatePartner(editingPartnerId, partnerForm);
+            await updatePartner(editingPartnerId, partnerForm);
             showMessage("パートナーを更新しました");
         } else {
-            addPartner(partnerForm);
+            await addPartner(partnerForm);
             showMessage("パートナーを追加しました");
         }
         setIsEditingPartner(false);
@@ -156,6 +236,17 @@ const AdminDashboard = () => {
         setEditingPartnerId(item.id);
         setIsEditingPartner(true);
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">読み込み中...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900 pb-safe">
@@ -225,14 +316,14 @@ const AdminDashboard = () => {
                         {!isEditingNews ? (
                             <div className="space-y-4">
                                 <button
-                                    onClick={() => { setNewsForm({ title: '', date: new Date().toLocaleDateString(), imageUrl: 'https://picsum.photos/400/200' }); setIsEditingNews(true); }}
+                                    onClick={() => { setNewsForm({ title: '', date: new Date().toLocaleDateString('ja-JP'), imageUrl: '' }); setIsEditingNews(true); }}
                                     className="w-full bg-green-50 text-green-700 py-3 rounded-xl font-bold border border-green-200 flex justify-center items-center gap-2"
                                 >
                                     <Plus size={18} /> お知らせを追加
                                 </button>
                                 {news.map(item => (
                                     <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-3">
-                                        <img src={item.imageUrl} className="w-16 h-16 rounded bg-gray-200 object-cover" alt="" />
+                                        {item.imageUrl && <img src={item.imageUrl} className="w-16 h-16 rounded bg-gray-200 object-cover" alt="" />}
                                         <div className="flex-1">
                                             <p className="text-xs text-gray-400">{item.date}</p>
                                             <p className="text-sm font-bold line-clamp-2">{item.title}</p>
@@ -255,10 +346,12 @@ const AdminDashboard = () => {
                                     <label className="block text-xs font-bold text-gray-500 mb-1">日付</label>
                                     <input required type="text" value={newsForm.date} onChange={e => setNewsForm({ ...newsForm, date: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">画像URL</label>
-                                    <input type="text" value={newsForm.imageUrl} onChange={e => setNewsForm({ ...newsForm, imageUrl: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
+                                <ImageUpload
+                                    currentUrl={newsForm.imageUrl}
+                                    onUpload={(url) => setNewsForm({ ...newsForm, imageUrl: url })}
+                                    bucket="news-images"
+                                    label="画像"
+                                />
                                 <div className="flex gap-2 pt-2">
                                     <button type="button" onClick={() => { setIsEditingNews(false); setEditingNewsId(null); }} className="flex-1 py-2 bg-gray-100 rounded-lg">キャンセル</button>
                                     <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-bold">保存</button>
@@ -284,6 +377,9 @@ const AdminDashboard = () => {
                                 </button>
                                 {coupons.map(item => (
                                     <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-2">
+                                        {item.imageUrl && (
+                                            <img src={item.imageUrl} className="w-full h-24 rounded object-cover" alt="" />
+                                        )}
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1">
                                                 <span className={`text-[10px] px-2 py-0.5 rounded border ${item.usageType === 'Unlimited' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
@@ -291,7 +387,6 @@ const AdminDashboard = () => {
                                                 </span>
                                                 <h4 className="font-bold mt-1">{item.title}</h4>
                                                 <p className="text-xs text-red-500 font-bold">{item.discount}</p>
-                                                {item.imageUrl && <p className="text-xs text-gray-400 mt-1">🖼️ 画像あり</p>}
                                             </div>
                                             <div className="flex gap-1">
                                                 <button onClick={() => startEditCoupon(item)} className="p-2 text-gray-400 hover:text-blue-500"><Edit2 size={16} /></button>
@@ -318,13 +413,12 @@ const AdminDashboard = () => {
                                     <label className="block text-xs font-bold text-gray-500 mb-1">割引内容</label>
                                     <input required type="text" value={couponForm.discount} onChange={e => setCouponForm({ ...couponForm, discount: e.target.value })} className="w-full p-2 border rounded" placeholder="例: 10% OFF / ¥1,000 OFF" />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">バナー画像URL (オプション)</label>
-                                    <input type="text" value={couponForm.imageUrl} onChange={e => setCouponForm({ ...couponForm, imageUrl: e.target.value })} className="w-full p-2 border rounded" placeholder="https://example.com/image.jpg" />
-                                    {couponForm.imageUrl && (
-                                        <img src={couponForm.imageUrl} alt="Preview" className="mt-2 w-full h-32 object-cover rounded border" />
-                                    )}
-                                </div>
+                                <ImageUpload
+                                    currentUrl={couponForm.imageUrl}
+                                    onUpload={(url) => setCouponForm({ ...couponForm, imageUrl: url })}
+                                    bucket="coupon-images"
+                                    label="バナー画像 (オプション)"
+                                />
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-1">有効期限</label>
                                     <input required type="date" value={couponForm.expiryDate} onChange={e => setCouponForm({ ...couponForm, expiryDate: e.target.value })} className="w-full p-2 border rounded" />
@@ -357,14 +451,14 @@ const AdminDashboard = () => {
                         {!isEditingPartner ? (
                             <div className="space-y-4">
                                 <button
-                                    onClick={() => { setPartnerForm({ name: '', category: 'GOLF_COURSE', logoUrl: 'https://placehold.jp/150x150.png', description: '' }); setIsEditingPartner(true); }}
+                                    onClick={() => { setPartnerForm({ name: '', category: 'GOLF_COURSE', logoUrl: '', description: '' }); setIsEditingPartner(true); }}
                                     className="w-full bg-green-50 text-green-700 py-3 rounded-xl font-bold border border-green-200 flex justify-center items-center gap-2"
                                 >
                                     <Plus size={18} /> パートナーを追加
                                 </button>
                                 {partners.map(item => (
                                     <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-3">
-                                        <img src={item.logoUrl} className="w-16 h-16 rounded bg-gray-200 object-contain p-1" alt="" />
+                                        {item.logoUrl && <img src={item.logoUrl} className="w-16 h-16 rounded bg-gray-200 object-contain p-1" alt="" />}
                                         <div className="flex-1">
                                             <p className="text-xs text-gray-400">{CATEGORY_OPTIONS.find(c => c.value === item.category)?.label}</p>
                                             <p className="text-sm font-bold">{item.name}</p>
@@ -390,10 +484,12 @@ const AdminDashboard = () => {
                                         {CATEGORY_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">ロゴURL</label>
-                                    <input type="text" value={partnerForm.logoUrl} onChange={e => setPartnerForm({ ...partnerForm, logoUrl: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
+                                <ImageUpload
+                                    currentUrl={partnerForm.logoUrl}
+                                    onUpload={(url) => setPartnerForm({ ...partnerForm, logoUrl: url })}
+                                    bucket="partner-logos"
+                                    label="ロゴ"
+                                />
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-1">説明 (オプション)</label>
                                     <textarea value={partnerForm.description} onChange={e => setPartnerForm({ ...partnerForm, description: e.target.value })} className="w-full p-2 border rounded" rows={3} />
