@@ -58,9 +58,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const [user] = useState<User>(MOCK_USER); // User is static for this demo
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [partners] = useState<Partner[]>(MOCK_PARTNERS); // Partners static for now
 
+    const [partners, setPartners] = useState<Partner[]>(() => loadInitialState('app_partners', MOCK_PARTNERS));
     const [news, setNews] = useState<NewsItem[]>(() => loadInitialState('app_news', MOCK_NEWS));
     const [coupons, setCoupons] = useState<Coupon[]>(() => loadInitialState('app_coupons', MOCK_COUPONS));
     const [config, setConfig] = useState<AppConfig>(() => loadInitialState('app_config', {
@@ -69,6 +68,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }));
 
     // Persistence Effects
+    useEffect(() => localStorage.setItem('app_partners', JSON.stringify(partners)), [partners]);
     useEffect(() => localStorage.setItem('app_news', JSON.stringify(news)), [news]);
     useEffect(() => localStorage.setItem('app_coupons', JSON.stringify(coupons)), [coupons]);
     useEffect(() => localStorage.setItem('app_config', JSON.stringify(config)), [config]);
@@ -104,8 +104,22 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         setCoupons(prev => prev.filter(c => c.id !== id));
     };
 
+    const addPartner = (item: Omit<Partner, 'id'>) => {
+        const newItem: Partner = { ...item, id: `p${Date.now()}` };
+        setPartners(prev => [newItem, ...prev]);
+    };
+
+    const updatePartner = (id: string, item: Partial<Partner>) => {
+        setPartners(prev => prev.map(p => p.id === id ? { ...p, ...item } : p));
+    };
+
+    const deletePartner = (id: string) => {
+        setPartners(prev => prev.filter(p => p.id !== id));
+    };
+
     const resetData = () => {
         if (window.confirm('全てのデータを初期状態に戻しますか？')) {
+            setPartners(MOCK_PARTNERS);
             setNews(MOCK_NEWS);
             setCoupons(MOCK_COUPONS);
             setConfig({
@@ -131,6 +145,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
             addCoupon,
             updateCoupon,
             deleteCoupon,
+            addPartner,
+            updatePartner,
+            deletePartner,
             resetData
         }}>
             {children}

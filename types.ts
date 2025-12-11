@@ -47,6 +47,7 @@ export interface Coupon {
   usageType: 'OneTime' | 'Unlimited';
   isUsed: boolean;
   terms: string;
+  imageUrl?: string; // Optional banner image for the coupon
   // UI helper property for listing (optional, but useful if backend joins data, otherwise we join on frontend)
   // For the purpose of this refactor, we will rely on partnerId to look up Partner info.
 }
