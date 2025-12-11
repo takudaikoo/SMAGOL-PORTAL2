@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Bell, Sparkles, ChevronRight } from 'lucide-react';
 import { getChatResponse } from '../services/geminiService';
-import { useConfig } from '../contexts/ConfigContext';
+import { useAppData } from '../contexts/AppDataContext';
 import { User, Tab, ChatMessage } from '../types';
-import { MOCK_NEWS, MOCK_COUPONS } from '../constants';
 
 interface HomeTabProps {
     user: User;
@@ -14,7 +13,10 @@ const HomeTab: React.FC<HomeTabProps> = ({
     user,
     setActiveTab
 }) => {
-    const { systemPrompt, knowledgeBase } = useConfig();
+    // Destructure everything needed from context
+    const { config, news, coupons } = useAppData();
+
+    // Local chat state
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [loadingAi, setLoadingAi] = useState(false);
@@ -29,13 +31,13 @@ const HomeTab: React.FC<HomeTabProps> = ({
         setInputText('');
         setLoadingAi(true);
 
-        // Get AI response
+        // Get AI response using dynamic data from context
         const responseText = await getChatResponse(
             user,
-            MOCK_COUPONS,
+            coupons, // Pass dynamic coupons to AI
             newHistory,
             userMsg.text,
-            { systemPrompt, knowledgeBase }
+            config // Pass dynamic config (system prompt/knowledge)
         );
 
         setChatHistory([...newHistory, { role: 'model', text: responseText }]);
@@ -90,8 +92,8 @@ const HomeTab: React.FC<HomeTabProps> = ({
                                 chatHistory.map((msg, idx) => (
                                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${msg.role === 'user'
-                                                ? 'bg-blue-600 text-white rounded-tr-none'
-                                                : 'bg-white text-gray-800 shadow-sm rounded-tl-none'
+                                            ? 'bg-blue-600 text-white rounded-tr-none'
+                                            : 'bg-white text-gray-800 shadow-sm rounded-tl-none'
                                             }`}>
                                             {msg.text}
                                         </div>
@@ -139,12 +141,12 @@ const HomeTab: React.FC<HomeTabProps> = ({
                     <span className="text-xs text-gray-400">すべて見る</span>
                 </div>
                 <div className="space-y-4">
-                    {MOCK_NEWS.map(news => (
-                        <div key={news.id} className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                            <img src={news.imageUrl} alt={news.title} className="w-16 h-16 rounded-lg object-cover bg-gray-200" />
+                    {news.map(item => (
+                        <div key={item.id} className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                            <img src={item.imageUrl} alt={item.title} className="w-16 h-16 rounded-lg object-cover bg-gray-200" />
                             <div className="ml-3 flex-1 flex flex-col justify-center">
-                                <p className="text-xs text-gray-400 mb-1">{news.date}</p>
-                                <p className="text-sm font-medium text-gray-800 line-clamp-2">{news.title}</p>
+                                <p className="text-xs text-gray-400 mb-1">{item.date}</p>
+                                <p className="text-sm font-medium text-gray-800 line-clamp-2">{item.title}</p>
                             </div>
                         </div>
                     ))}

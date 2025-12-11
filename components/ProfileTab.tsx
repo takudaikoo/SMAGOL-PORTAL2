@@ -4,10 +4,9 @@ import { User } from '../types';
 
 interface ProfileTabProps {
     user: User;
-    onAdminClick?: () => void;
 }
 
-const ProfileTab: React.FC<ProfileTabProps> = ({ user, onAdminClick }) => {
+const ProfileTab: React.FC<ProfileTabProps> = ({ user }) => {
     return (
         <div className="px-6 py-8 pb-24">
             <div className="flex items-center space-x-4 mb-8">
@@ -36,17 +35,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onAdminClick }) => {
                     </button>
                 ))}
 
-                {/* Admin Entry (Hidden-ish) */}
-                <button
-                    onClick={onAdminClick}
-                    className="w-full bg-gray-100 p-4 rounded-xl shadow-inner flex items-center justify-between text-gray-600 hover:bg-gray-200 mt-4"
-                >
-                    <div className="flex items-center space-x-3">
-                        <Settings size={20} />
-                        <span className="font-bold">管理画面 (デモ用)</span>
-                    </div>
-                    <ChevronRight size={18} />
-                </button>
+
             </div>
 
             <div className="mt-8 text-center text-xs text-gray-400">
