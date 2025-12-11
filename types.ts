@@ -61,9 +61,14 @@ export interface NewsItem {
 export interface CompetitionEvent {
   id: string;
   title: string;
-  status: 'upcoming' | 'ongoing' | 'ended';
-  startDate: string;
-  endDate: string;
-  url: string;
-  imageUrl?: string;
+  date: string;
+  course: string;
+  participants: number;
+  status: 'Open' | 'Closed' | 'Upcoming';
+  imageUrl: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
 }

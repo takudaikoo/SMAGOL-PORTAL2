@@ -1,24 +1,46 @@
 import React, { useState } from 'react';
 import { Bell, Sparkles, ChevronRight } from 'lucide-react';
-import { User, Tab, NewsItem } from '../types';
-import { MOCK_NEWS } from '../constants';
+import { getChatResponse } from '../services/geminiService';
+import { useConfig } from '../contexts/ConfigContext';
+import { User, Tab, ChatMessage } from '../types';
+import { MOCK_NEWS, MOCK_COUPONS } from '../constants';
 
 interface HomeTabProps {
     user: User;
     setActiveTab: (tab: Tab) => void;
-    loadingAi: boolean;
-    aiRecommendation: string | null;
-    fetchAiRecommendation: () => void;
 }
 
 const HomeTab: React.FC<HomeTabProps> = ({
     user,
-    setActiveTab,
-    loadingAi,
-    aiRecommendation,
-    fetchAiRecommendation
+    setActiveTab
 }) => {
-    const [aiMode, setAiMode] = useState<'coupon' | 'inquiry'>('coupon');
+    const { systemPrompt, knowledgeBase } = useConfig();
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [inputText, setInputText] = useState('');
+    const [loadingAi, setLoadingAi] = useState(false);
+
+    const handleSendMessage = async () => {
+        if (!inputText.trim() || loadingAi) return;
+
+        const userMsg: ChatMessage = { role: 'user', text: inputText };
+        const newHistory = [...chatHistory, userMsg];
+
+        setChatHistory(newHistory);
+        setInputText('');
+        setLoadingAi(true);
+
+        // Get AI response
+        const responseText = await getChatResponse(
+            user,
+            MOCK_COUPONS,
+            newHistory,
+            userMsg.text,
+            { systemPrompt, knowledgeBase }
+        );
+
+        setChatHistory([...newHistory, { role: 'model', text: responseText }]);
+        setLoadingAi(false);
+    };
 
     return (
         <div className="space-y-6 pb-24">
@@ -50,70 +72,62 @@ const HomeTab: React.FC<HomeTabProps> = ({
                 <div className="px-6">
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 relative overflow-hidden">
 
-                        {/* Toggle Switch */}
-                        <div className="flex justify-center mb-4 relative z-10">
-                            <div className="bg-white/50 p-1 rounded-full flex relative">
-                                <div
-                                    className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-all duration-300 ease-out ${aiMode === 'coupon' ? 'left-1' : 'left-[calc(50%)]'}`}
-                                ></div>
-                                <button
-                                    onClick={() => setAiMode('coupon')}
-                                    className={`relative z-10 px-4 py-1.5 text-xs font-bold rounded-full transition-colors ${aiMode === 'coupon' ? 'text-blue-900' : 'text-blue-400'}`}
-                                >
-                                    クーポン
-                                </button>
-                                <button
-                                    onClick={() => setAiMode('inquiry')}
-                                    className={`relative z-10 px-4 py-1.5 text-xs font-bold rounded-full transition-colors ${aiMode === 'inquiry' ? 'text-blue-900' : 'text-blue-400'}`}
-                                >
-                                    お問い合わせ
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start space-x-3 relative z-10">
+                        {/* Title & Mode */}
+                        <div className="flex items-center space-x-2 mb-4">
                             <div className="bg-white p-2 rounded-full shadow-sm">
-                                <Sparkles size={20} className="text-yellow-500" />
+                                <Sparkles size={18} className="text-yellow-500" />
                             </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-blue-900 text-sm mb-1">
-                                    {aiMode === 'coupon' ? 'AI クーポンコンシェルジュ' : 'AI お問い合わせアシスタント'}
-                                </h3>
-
-                                {aiMode === 'coupon' ? (
-                                    <>
-                                        {loadingAi ? (
-                                            <p className="text-xs text-blue-700 animate-pulse">考え中...</p>
-                                        ) : aiRecommendation ? (
-                                            <p className="text-xs text-blue-800 leading-relaxed">{aiRecommendation}</p>
-                                        ) : (
-                                            <p className="text-xs text-blue-700">あなたにぴったりのクーポンをご提案します。</p>
-                                        )}
-
-                                        {!aiRecommendation && !loadingAi && (
-                                            <button
-                                                onClick={fetchAiRecommendation}
-                                                className="mt-2 text-xs bg-white text-blue-900 px-3 py-1.5 rounded-full font-bold shadow-sm inline-block"
-                                            >
-                                                おすすめを聞く
-                                            </button>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        <p className="text-xs text-blue-700 mb-2">
-                                            施設のご利用やサービスについて、ご不明な点はありませんか？AIがお答えします。
-                                        </p>
-                                        <button
-                                            className="mt-1 text-xs bg-white text-blue-900 px-3 py-1.5 rounded-full font-bold shadow-sm inline-block"
-                                            onClick={() => alert('AIチャットボット（Dify連携予定）を起動します')}
-                                        >
-                                            チャットを始める
-                                        </button>
-                                    </>
-                                )}
-                            </div>
+                            <h3 className="font-bold text-blue-900 text-sm">AI コンシェルジュ</h3>
                         </div>
+
+                        {/* Chat Area */}
+                        <div className="bg-white/60 rounded-lg p-3 min-h-[200px] max-h-[300px] overflow-y-auto mb-3 space-y-3">
+                            {chatHistory.length === 0 ? (
+                                <p className="text-xs text-blue-800 text-center py-4 opacity-70">
+                                    クーポンやサービスについて<br />お気軽にお尋ねください。
+                                </p>
+                            ) : (
+                                chatHistory.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${msg.role === 'user'
+                                                ? 'bg-blue-600 text-white rounded-tr-none'
+                                                : 'bg-white text-gray-800 shadow-sm rounded-tl-none'
+                                            }`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            {loadingAi && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white text-gray-800 shadow-sm rounded-2xl rounded-tl-none px-3 py-2 text-xs">
+                                        <span className="animate-pulse">...</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                                placeholder="質問を入力..."
+                                className="flex-1 text-xs px-3 py-2 rounded-full border border-blue-200 focus:outline-none focus:border-blue-500 bg-white"
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                disabled={loadingAi}
+                            />
+                            <button
+                                onClick={handleSendMessage}
+                                disabled={loadingAi || !inputText.trim()}
+                                className={`p-2 rounded-full text-white transition-colors ${loadingAi || !inputText.trim() ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
+                                    }`}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             </div>
