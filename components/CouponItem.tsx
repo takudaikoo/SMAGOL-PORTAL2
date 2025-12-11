@@ -10,6 +10,13 @@ interface CouponItemProps {
 const CouponItem: React.FC<CouponItemProps> = ({ coupon, onUse }) => {
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col ${coupon.isUsed ? 'opacity-60 grayscale' : ''}`}>
+      {/* Coupon Banner Image */}
+      {coupon.imageUrl && (
+        <div className="w-full h-32 bg-gray-100">
+          <img src={coupon.imageUrl} alt={coupon.title} className="w-full h-full object-cover" />
+        </div>
+      )}
+
       <div className="p-4 flex-1">
         <div className="flex justify-between items-start mb-2">
           {coupon.usageType === 'Unlimited' ? (
@@ -52,8 +59,8 @@ const CouponItem: React.FC<CouponItemProps> = ({ coupon, onUse }) => {
               onClick={() => !coupon.isUsed && onUse(coupon)}
               disabled={coupon.isUsed}
               className={`w-full py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 ${coupon.isUsed
-                  ? 'bg-gray-300 text-white cursor-not-allowed'
-                  : 'bg-white text-blue-900 border border-blue-900 hover:bg-blue-50'
+                ? 'bg-gray-300 text-white cursor-not-allowed'
+                : 'bg-white text-blue-900 border border-blue-900 hover:bg-blue-50'
                 }`}
             >
               {coupon.isUsed ? '使用済み' : 'クーポンを使う'}
